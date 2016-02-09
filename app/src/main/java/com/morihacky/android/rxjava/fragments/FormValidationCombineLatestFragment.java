@@ -7,10 +7,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
-import butterknife.ButterKnife;
-import butterknife.Bind;
+
 import com.jakewharton.rxbinding.widget.RxTextView;
 import com.morihacky.android.rxjava.R;
+import com.morihacky.android.rxjava.RxUtils;
+
+import butterknife.Bind;
+import butterknife.ButterKnife;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
@@ -55,9 +58,13 @@ public class FormValidationCombineLatestFragment
     @Override
     public void onPause() {
         super.onPause();
-        if (_subscription != null) {
-            _subscription.unsubscribe();
-        }
+        RxUtils.unsubscribeIfNotNull(_subscription);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        ButterKnife.unbind(this);
     }
 
     private void _combineLatestEvents() {

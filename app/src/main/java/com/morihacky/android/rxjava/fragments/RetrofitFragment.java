@@ -10,18 +10,17 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
-import butterknife.ButterKnife;
 import butterknife.Bind;
+import butterknife.ButterKnife;
 import butterknife.OnClick;
 import com.morihacky.android.rxjava.R;
 import com.morihacky.android.rxjava.RxUtils;
 import com.morihacky.android.rxjava.retrofit.Contributor;
 import com.morihacky.android.rxjava.retrofit.GithubApi;
+import com.morihacky.android.rxjava.retrofit.GithubService;
 import com.morihacky.android.rxjava.retrofit.User;
 import java.util.ArrayList;
 import java.util.List;
-import retrofit.RequestInterceptor;
-import retrofit.RestAdapter;
 import rx.Observable;
 import rx.Observer;
 import rx.android.schedulers.AndroidSchedulers;
@@ -41,14 +40,30 @@ public class RetrofitFragment
     @Bind(R.id.demo_retrofit_contributors_repository) EditText _repo;
     @Bind(R.id.log_list) ListView _resultList;
 
-    private GithubApi _api;
     private ArrayAdapter<String> _adapter;
+    private GithubApi _githubService;
     private CompositeSubscription _subscriptions = new CompositeSubscription();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        _api = _createGithubApi();
+        String githubToken = getResources().getString(R.string.github_oauth_token);
+        _githubService = GithubService.createGithubService(githubToken);
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater,
+          @Nullable ViewGroup container,
+          @Nullable Bundle savedInstanceState) {
+
+        View layout = inflater.inflate(R.layout.fragment_retrofit, container, false);
+        ButterKnife.bind(this, layout);
+
+        _adapter = new ArrayAdapter<>(getActivity(), R.layout.item_log, R.id.item_log, new ArrayList<String>());
+        //_adapter.setNotifyOnChange(true);
+        _resultList.setAdapter(_adapter);
+
+        return layout;
     }
 
     @Override
@@ -60,26 +75,13 @@ public class RetrofitFragment
     @Override
     public void onPause() {
         super.onPause();
-
         RxUtils.unsubscribeIfNotNull(_subscriptions);
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-
-        View layout = inflater.inflate(R.layout.fragment_retrofit, container, false);
-        ButterKnife.bind(this, layout);
-
-        _adapter = new ArrayAdapter<>(getActivity(),
-              R.layout.item_log,
-              R.id.item_log,
-              new ArrayList<String>());
-        //_adapter.setNotifyOnChange(true);
-        _resultList.setAdapter(_adapter);
-
-        return layout;
+    public void onDestroyView() {
+        super.onDestroyView();
+        ButterKnife.unbind(this);
     }
 
     @OnClick(R.id.btn_demo_retrofit_contributors)
@@ -87,7 +89,7 @@ public class RetrofitFragment
         _adapter.clear();
 
         _subscriptions.add(//
-              _api.contributors(_username.getText().toString(), _repo.getText().toString())
+              _githubService.contributors(_username.getText().toString(), _repo.getText().toString())
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(new Observer<List<Contributor>>() {
@@ -98,8 +100,7 @@ public class RetrofitFragment
 
                         @Override
                         public void onError(Throwable e) {
-                            Timber.e(e,
-                                  "woops we got an error while getting the list of contributors");
+                            Timber.e(e, "woops we got an error while getting the list of contributors");
                         }
 
                         @Override
@@ -123,8 +124,7 @@ public class RetrofitFragment
     public void onListContributorsWithFullUserInfoClicked() {
         _adapter.clear();
 
-        _subscriptions.add(_api.contributors(_username.getText().toString(),
-              _repo.getText().toString())
+        _subscriptions.add(_githubService.contributors(_username.getText().toString(), _repo.getText().toString())
               .flatMap(new Func1<List<Contributor>, Observable<Contributor>>() {
                   @Override
                   public Observable<Contributor> call(List<Contributor> contributors) {
@@ -134,7 +134,7 @@ public class RetrofitFragment
               .flatMap(new Func1<Contributor, Observable<Pair<User, Contributor>>>() {
                   @Override
                   public Observable<Pair<User, Contributor>> call(Contributor contributor) {
-                      Observable<User> _userObservable = _api.user(contributor.login)
+                      Observable<User> _userObservable = _githubService.user(contributor.login)
                             .filter(new Func1<User, Boolean>() {
                                 @Override
                                 public Boolean call(User user) {
@@ -146,8 +146,7 @@ public class RetrofitFragment
                             Observable.just(contributor),
                             new Func2<User, Contributor, Pair<User, Contributor>>() {
                                 @Override
-                                public Pair<User, Contributor> call(User user,
-                                                                    Contributor contributor) {
+                                public Pair<User, Contributor> call(User user, Contributor contributor) {
                                     return new Pair<>(user, contributor);
                                 }
                             });
@@ -163,8 +162,7 @@ public class RetrofitFragment
 
                   @Override
                   public void onError(Throwable e) {
-                      Timber.e(e,
-                            "error while getting the list of contributors along with full names");
+                      Timber.e(e, "error while getting the list of contributors along with full " + "names");
                   }
 
                   @Override
@@ -187,26 +185,5 @@ public class RetrofitFragment
                             _repo.getText().toString());
                   }
               }));
-    }
-
-    // -----------------------------------------------------------------------------------
-
-    private GithubApi _createGithubApi() {
-
-        RestAdapter.Builder builder = new RestAdapter.Builder().setEndpoint(
-              "https://api.github.com/");
-        //.setLogLevel(RestAdapter.LogLevel.FULL);
-
-        final String githubToken = getResources().getString(R.string.github_oauth_token);
-        if (!isEmpty(githubToken)) {
-            builder.setRequestInterceptor(new RequestInterceptor() {
-                @Override
-                public void intercept(RequestFacade request) {
-                    request.addHeader("Authorization", format("token %s", githubToken));
-                }
-            });
-        }
-
-        return builder.build().create(GithubApi.class);
     }
 }

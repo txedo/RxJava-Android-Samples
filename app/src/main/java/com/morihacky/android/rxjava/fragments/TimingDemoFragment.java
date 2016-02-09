@@ -7,16 +7,19 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListView;
-import butterknife.ButterKnife;
-import butterknife.Bind;
-import butterknife.OnClick;
+
 import com.morihacky.android.rxjava.R;
 import com.morihacky.android.rxjava.wiring.LogAdapter;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import butterknife.Bind;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
@@ -49,6 +52,12 @@ public class TimingDemoFragment
         View layout = inflater.inflate(R.layout.fragment_demo_timing, container, false);
         ButterKnife.bind(this, layout);
         return layout;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        ButterKnife.unbind(this);
     }
 
     // -----------------------------------------------------------------------------------
@@ -118,7 +127,7 @@ public class TimingDemoFragment
         _log(String.format("C3 [%s] --- BTN click", _getCurrentTimestamp()));
 
         _subscription2 = Observable//
-              .timer(0, 1, TimeUnit.SECONDS)//
+              .interval(0, 1, TimeUnit.SECONDS)//
               .subscribe(new Observer<Long>() {
                   @Override
                   public void onCompleted() {
